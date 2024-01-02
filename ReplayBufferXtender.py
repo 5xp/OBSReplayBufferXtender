@@ -15,6 +15,7 @@ class ReplayBufferXtender:
     base_dir = None
     prepend_window_name = True
     use_windowsapps = True
+    fullscreen_game_detection = True
     disallowed_chars = ["\\", "/", ":", '*',
                         "?", '"', "<", ">", "|", ".exe", "$"]
 
@@ -64,6 +65,21 @@ class ReplayBufferXtender:
                 w_text = w_text.replace(char, "")
 
         return w_text.strip()
+
+    def is_window_fullscreen(self, hwnd) -> bool:
+        """
+        Uses the win32api to check if a window is fullscreen
+        """
+
+        # Get the window rect
+        rect = wgui.GetWindowRect(hwnd)
+
+        # Get the screen size
+        screen_width = win32api.GetSystemMetrics(0)
+        screen_height = win32api.GetSystemMetrics(1)
+
+        # Check if the window is fullscreen
+        return rect[2] - rect[0] == screen_width and rect[3] - rect[1] == screen_height
 
     def get_focused_window_executable_path(self) -> str:
         """
@@ -127,6 +143,10 @@ class ReplayBufferXtender:
                 os.rename(lr_orig_fullpath, os.path.join(self.base_dir, lr_fname))
                 return
             return
+
+        if self.fullscreen_game_detection:
+            if not self.is_window_fullscreen(wgui.GetForegroundWindow()):
+                sub_dir = "Desktop"
 
         if self.prepend_window_name:
             lr_fname = lr_fname.replace("Replay", sub_dir)
@@ -197,6 +217,13 @@ def script_properties() -> any:
         description="Prepend Window Name"
     )
 
+    # Option to detect whether the focused window is fullscreen, and if it isn't, put it in a Desktop directory
+    o.obs_properties_add_bool(
+        props=p,
+        name="fullscreenGameDetection",
+        description="Fullscreen Game Detection"
+    )
+
     return p
 
 
@@ -213,11 +240,18 @@ def script_defaults(s) -> None:
         val=ReplayBufferXtender.prepend_window_name
     )
 
+    o.obs_data_set_default_bool(
+        data=s,
+        name="fullscreenGameDetection",
+        val=ReplayBufferXtender.fullscreen_game_detection
+    )
+
 
 def script_update(s) -> None:
     inst.base_dir = o.obs_data_get_string(s, "baseSavePath")
     inst.use_windowsapps = o.obs_data_get_bool(s, "useWindowsapps")
     inst.prepend_window_name = o.obs_data_get_bool(s, "prependWindowName")
+    inst.fullscreen_game_detection = o.obs_data_get_bool(s, "fullscreenGameDetection")
 
 
 def on_event(event, *_) -> None:
